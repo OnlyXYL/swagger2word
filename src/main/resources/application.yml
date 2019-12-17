@@ -17,10 +17,10 @@ spring:
     encoding: UTF-8
     mode: HTML5
 
-# Swagger json url address
-# etc. https://petstore.swagger.io/
-swagger.url: https://petstore.swagger.io/v2/swagger.json
-
+  # Swagger json url address
+  # etc. https://petstore.swagger.io/
+swagger.url:  http://localhost:8081/manage-portal/v2/api-docs
+#swagger.url: https://petstore.swagger.io/v2/swagger.json
 
 
 

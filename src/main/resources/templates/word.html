@@ -59,7 +59,8 @@
 <body>
 <div style="width:800px; margin: 0 auto" th:with="count=1">
     <div>
-        <p class="doc_title" th:text="${info.title+'（'+info.version+'）'}"></p>
+        <!--<p class="doc_title" th:text="${info.title+'（'+info.version+'）'}"></p>-->
+        <p class="doc_title" th:text="${info.title}"></p>
         <a class="download_btn" th:href="${'/downloadWord?url='+url}" th:if="${type!=1}">下载文档</a>
         <br>
     </div>
