@@ -109,7 +109,7 @@ public class WordServiceImpl implements WordService {
                     table.setRequestForm(requestForm);
                     table.setResponseForm(responseForm);
                     table.setRequestType(requestType);
-                    table.setRequestList(processRequestList(parameters));
+                    table.setRequestList(processRequestList(parameters, definitinMap));
                     table.setResponseList(processResponseCodeList(responses));
 
                     // 取出来状态是200时的返回值
@@ -121,7 +121,6 @@ public class WordServiceImpl implements WordService {
                     //示例
                     table.setRequestParam(JsonUtils.writeJsonStr(buildParamMap(table.getRequestList(), map)));
                     table.setResponseParam(processResponseParam(obj, map));
-
                     result.add(table);
                 }
 
@@ -184,6 +183,107 @@ public class WordServiceImpl implements WordService {
         return requestList;
     }
 
+    /**
+     * 处理请求参数列表
+     *
+     * @param parameters
+     * @return
+     */
+    private List<Request> processRequestList(List<LinkedHashMap> parameters, Map<String, Object> definitinMap) {
+        List<Request> requestList = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(parameters)) {
+            for (Map<String, Object> param : parameters) {
+//                Request request = new Request();
+//                request.setName(String.valueOf(param.get("name")));
+                Object in = param.get("in");
+                if (in != null && "body".equals(in)) {
+//                    request.setType(String.valueOf(in));
+                    Map<String, Object> schema = (Map) param.get("schema");
+                    String type = (String) schema.get("type");
+                    String ref = null;
+                    // 数组情况另外处理
+                    if (StringUtils.isNotBlank(type) && "array".equals(type)) {
+                        Map<String, Object> items = (Map<String, Object>) schema.get("items");
+                        if (items != null && items.get("$ref") != null) {
+                            ref = (String) items.get("$ref");
+                            Request request = new Request();
+                            request.setName(String.valueOf(param.get("name")));
+
+                            request.setType(param.get("type") == null ? "Object" : param.get("type").toString());
+                            request.setParamType(ref == null ? "{}" : ref + "");
+                            if (param.get("required") != null) {
+                                request.setRequire((Boolean) param.get("required"));
+                            } else {
+                                request.setRequire(false);
+                            }
+                            requestList.add(request);
+                        }
+                    } else {
+                        //对象
+                        if (schema.get("$ref") != null) {
+                            ref = (String) schema.get("$ref");
+
+                            if (StringUtils.isNotBlank(ref)) {
+                                Map<String, Object> mode = (Map<String, Object>) definitinMap.get(ref);
+
+                                if (Objects.nonNull(mode)) {
+                                    List<ResponseModelAttr> properties = (List<ResponseModelAttr>) mode.get("properties");
+
+                                    for (ResponseModelAttr modelAttr : properties) {
+                                        Request request = new Request();
+                                        request.setName(modelAttr.getValue());
+                                        request.setParamType(modelAttr.getType());
+                                        request.setType(modelAttr.getType());
+                                        request.setRemark(modelAttr.getName());
+                                        if (param.get("required") != null) {
+                                            request.setRequire((Boolean) param.get("required"));
+                                        } else {
+                                            request.setRequire(false);
+                                        }
+
+                                        requestList.add(request);
+                                    }
+                                }else{
+                                    Request request = new Request();
+                                    request.setName(String.valueOf(param.get("name")));
+
+                                    request.setType(param.get("type") == null ? "Object" : param.get("type").toString());
+                                    request.setParamType(ref == null ? "{}" : ref + "");
+                                    if (param.get("required") != null) {
+                                        request.setRequire((Boolean) param.get("required"));
+                                    } else {
+                                        request.setRequire(false);
+                                    }
+                                    requestList.add(request);
+                                }
+
+                            }
+
+                        }
+                    }
+
+                } else {
+
+                    Request request = new Request();
+                    request.setName(String.valueOf(param.get("name")));
+
+                    request.setType(param.get("type") == null ? "Object" : param.get("type").toString());
+                    request.setParamType(String.valueOf(in));
+                    if (param.get("required") != null) {
+                        request.setRequire((Boolean) param.get("required"));
+                    } else {
+                        request.setRequire(false);
+                    }
+                    request.setRemark(String.valueOf(param.get("description")));
+                    request.setParamType(request.getParamType().replaceAll("#/definitions/", ""));
+                    requestList.add(request);
+                }
+
+            }
+        }
+        return requestList;
+    }
+
 
     /**
      * 处理返回码列表
@@ -225,7 +325,8 @@ public class WordServiceImpl implements WordService {
                 ref = (String) items.get("$ref");
             }
         } else {
-            if (schema.get("$ref") != null) {//对象
+            //对象
+            if (schema.get("$ref") != null) {
                 ref = (String) schema.get("$ref");
             } else {//其他类型
                 ResponseModelAttr attr = new ResponseModelAttr();
@@ -236,14 +337,33 @@ public class WordServiceImpl implements WordService {
 
         if (StringUtils.isNotBlank(ref)) {
             Map<String, Object> mode = (Map<String, Object>) definitinMap.get(ref);
+            if (Objects.nonNull(mode)) {
 
-            ResponseModelAttr attr = new ResponseModelAttr();
-            attr.setClassName((String) mode.get("title"));
-            attr.setName((String) mode.get("description"));
-            attr.setType(StringUtils.defaultIfBlank(type, StringUtils.EMPTY));
-            attrList.add(attr);
+                ResponseModelAttr attr = new ResponseModelAttr();
+//            attr.setClassName((String) mode.get("title"));
+//            attr.setName((String) mode.get("description"));
 
-            attrList.addAll((List<ResponseModelAttr>) mode.get("properties"));
+                Object title = mode.get("title");
+                if (Objects.isNull(title)) {
+                    attr.setClassName("");
+                } else {
+
+                    attr.setClassName(title+"");
+                }
+
+                Object description = mode.get("description");
+                if (Objects.isNull(description)) {
+                    attr.setName("");
+                } else {
+
+                    attr.setName(description+"");
+                }
+
+                attr.setType(StringUtils.defaultIfBlank(type, StringUtils.EMPTY));
+                attrList.add(attr);
+
+                attrList.addAll((List<ResponseModelAttr>) mode.get("properties"));
+            }
         }
         return attrList;
     }
@@ -432,6 +552,10 @@ public class WordServiceImpl implements WordService {
             for (Request request : list) {
                 String name = request.getName();
                 String type = request.getType();
+                if (StringUtils.isEmpty(type)) {
+                    System.out.println(request.toString());
+                    continue;
+                }
                 switch (type) {
                     case "string":
                         paramMap.put(name, "string");
